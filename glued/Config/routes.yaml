@@ -1,0 +1,41 @@
+---
+routes:
+
+    #########################################################
+    # IF / NODES                                            #
+    #########################################################
+
+    be_if:
+        service:    if
+        path:       /api/if
+        pattern:    /api/if
+        label:      IF
+        dscr:       A routegroup, no methods here.
+
+
+    #########################################################
+    # IF SVC / fio_cz / INFO                           #
+    #########################################################
+
+    be_if_svc_fio_cz_v1:
+        pattern:    ${routes.be_if.path}/svc/fio_cz/v1/docs
+        path:       ${routes.be_if.path}/svc/fio_cz/v1/docs
+        label:      fio_cz
+        dscr:       Caretag SQL based integration service.
+        service:    if/fio_cz
+        provides:   docs
+        methods:
+            get:    Glued\Controllers\IfController:docs_r1
+
+    #########################################################
+    # IF / fio_cz / ACT                                #
+    #########################################################
+
+    be_if_svc_fio_cz_v1_act:
+        pattern:    ${routes.be_if.path}/svc/fio_cz/v1/act/{uuid}[/{from}]
+        path:       ${routes.be_if.path}/svc/fio_cz/v1/act
+        label:      Run action
+        dscr:       Run an action
+        service:    if/fio_cz
+        methods:
+            get:    Glued\Controllers\IfController:act_r1

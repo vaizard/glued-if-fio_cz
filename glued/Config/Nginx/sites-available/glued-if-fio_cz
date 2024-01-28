@@ -1,0 +1,41 @@
+##
+# Please see /usr/share/doc/nginx-doc/examples/ for more detailed examples.
+##
+
+server {
+        ##########################
+        # Server setup           #
+        ##########################
+
+        root /var/www/html/glued-if-fio_cz/public;
+        listen 8017 ssl default_server;
+        listen [::]:8017 ssl default_server;
+        http2 on;
+        include snippets/server/common.conf;
+
+        ##########################
+        # Path locations         #
+        ##########################
+
+        # Main locations
+        include snippets/common/location-main.conf;
+
+        ##########################
+        # PHP location match     #
+        ##########################
+
+        include snippets/common/location-php.conf;
+
+        ##########################
+        # Exact locations        #
+        ##########################
+
+        # none
+
+        ##########################
+        # Deny location match    #
+        ##########################
+
+        include snippets/common/location-deny.conf;
+}
+
