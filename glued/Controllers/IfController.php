@@ -23,48 +23,6 @@ class IfController extends AbstractController
         parent::__construct($c);
     }
 
-
-
-    private function transform($data)
-    {
-        $transformer = new ArrayTransformer();
-        $transformer
-            ->set('domicile', 'CZ')
-            ->map('regid.val', 'ico')
-            ->map('vatid.val', 'dic')
-            ->map('name.0.val', 'obchodniJmeno')
-            ->map('name.0.kind', 'obchodniJmeno',
-                $transformer->rule()->callback(function ($v) { return 'business'; } ))
-            ->map('address.0.kind', 'adresaDorucovaci.textovaAdresa',
-                $transformer->rule()->callback(function ($v) { return 'business'; } ))
-            ->map('address.0.val', 'sidlo.textovaAdresa')
-            ->map('address.0.countrycode','sidlo.kodStatu')
-            ->map('address.0.region', 'sidlo.nazevKraje')
-            ->map('address.0.district', 'sidlo.nazevOkresu')
-            ->map('address.0.municipality', 'sidlo.nazevObce')
-            ->map('address.0.street', 'sidlo.nazevUlice')
-            ->map('address.0.conscriptionnumber', 'sidlo.cisloDomovni')
-            ->map('address.0.streetnumber', 'sidlo.cisloOrientacni')
-            ->map('address.0.suburb', 'sidlo.nazevCastiObce')
-            ->map('address.0.postcode', 'sidlo.psc')
-            ->set('address.0.kind', 'business')
-            ->map('address.1.val', 'adresaDorucovaci.textovaAdresa')
-            ->map('address.1.kind', 'adresaDorucovaci.textovaAdresa',
-                $transformer->rule()->callback(function ($v) { return 'forwarding'; } ))
-            ->map('registration.0.date.establishing', 'datumVzniku')
-            ->map('registration.0.date.update', 'datumAktualizace')
-            ->map('registration.0.date.termination', 'datumZaniku')
-            ->set('registration.0.kind', 'business');
-        $data = json_decode($data, true);
-        foreach ($data['ekonomickeSubjekty'] as $item) {
-            $i = new JsonObject($item, true);
-            $obj = $transformer->toArray($item);
-            if ($i->{'$.dalsiUdaje.*.spisovaZnacka'}) { $obj['registration'][0]['val'] = $i->{'$.dalsiUdaje.*.spisovaZnacka'}[0]; }
-            $objs[] = $obj;
-        }
-        return $objs;
-    }
-
     private function fetch($token, $from, $to) :? array {
         $token = $token;
         $uri = "https://www.fio.cz/ib_api/rest/periods/{$token}/{$from}/{$to}/transactions.json";
@@ -78,53 +36,6 @@ class IfController extends AbstractController
         $data = json_decode($response, true);
         if (!$data) { throw new \Exception("Error: {$response}.", 400); }
         return $data;
-    }
-    private function fetch2(string $q) : mixed
-    {
-        $uri = 'https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/vyhledat';
-        $content = '{"obchodniJmeno":"' . $q . '","pocet":10,"start":0,"razeni":[]}';
-        $key = hash('md5', $uri . $content);
-
-        if ($this->fscache->has($key)) {
-            $response = $this->fscache->get($key);
-            $final = $this->transform($response);
-            foreach ($final as &$f) {
-                $fid = $f['regid']['val'];
-                $f['save'] = $base = $this->settings['glued']['protocol'].$this->settings['glued']['hostname'].$this->settings['routes']['be_contacts_import_v1']['path'] . '/';
-                $f['save'] .= "$this->action/$fid";
-            }
-            return $final;
-        }
-
-        try {
-            if (mb_strlen($q, 'UTF-8') < 2) {
-                throw new \Exception('Query string too short');
-            }
-            $client = new HttpBrowser(HttpClient::create(['timeout' => 20]));
-            $client->setServerParameter('HTTP_USER_AGENT', 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:113.0) Gecko/20100101 Firefox/113.0');
-            $client->setServerParameter('CONTENT_TYPE', 'application/json');
-            $client->setServerParameter('HTTP_ACCEPT', 'application/json');
-            $response = $client->request(method: 'POST', uri: $uri, parameters: [], files: [], server: [], content: $content);
-        } catch (\Exception $e) {
-            return null;
-        }
-        $response = $client->getResponse()->getContent() ?? null;
-        $this->fscache->set($key, $response, 3600);
-        $final = $this->transform($response);
-        $stmt = $this->mysqli->prepare($this->q);
-        foreach ($final as &$f) {
-            $fid = $f['regid']['val'];
-            $obj = json_encode($f);
-            $run = NULL;
-            $stmt->bind_param("ssss", $this->action, $fid, $obj, $run);
-            $stmt->execute();
-            $f['save'] = $base = $this->settings['glued']['protocol'].$this->settings['glued']['hostname'].$this->settings['routes']['be_contacts_import_v1']['path'] . '/';
-            $f['save'] .= "$this->action/$fid";
-        }
-
-
-        //$this->fscache->set($key, $response, 3600);
-        return $final;
     }
 
     private function get_token($action) {
@@ -177,7 +88,7 @@ class IfController extends AbstractController
             $dt = substr($ext_data['column0']['value'], 0, 10); // Extracts "2023-11-14"
             $tz = substr($ext_data['column0']['value'], 10);
             $t->set("at", $dt);
-            $t->set("tz", $dt);
+            $t->set("tz", $tz);
         }
         //$t->map("at", "column0.value");
         $t->map("volume", "column1.value");
@@ -201,6 +112,7 @@ class IfController extends AbstractController
         $t->map("meta.type", "column8.value"); // bezhotovostni platba
         $t->map("who.bank.bic", "column26.value");
         $data = $t->toArray($ext_data);
+
         return json_encode($data);
     }
     private function transactions($account, $data) {
