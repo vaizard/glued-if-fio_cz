@@ -112,9 +112,9 @@ class IfController extends AbstractController
         $t->map("meta.type", "column8.value"); // bezhotovostni platba
         $t->map("who.bank.bic", "column26.value");
         $data = $t->toArray($ext_data);
-
         return json_encode($data);
     }
+
     private function transactions($account, $data) {
         if (!$account) { throw new \Exception('Account UUID missing', 500); }
         $d = $data['accountStatement']['transactionList']['transaction'] ?? false;
@@ -133,8 +133,30 @@ class IfController extends AbstractController
         }
     }
 
+    private function transactions_remap() {
+        $q = 'SELECT uuid, ext_data FROM t_settlement_transactions WHERE ext_schema = "fio_cz"';
+        $res = $this->mysqli->execute_query($q, []);
+        if (!$res) { throw new \Exception('No transactions found for remapping', 404); }
+        $updateQuery = 'UPDATE t_settlement_transactions SET data = ? WHERE uuid = ?';
+        $this->mysqli->begin_transaction();
+        try {
+            foreach ($res as $row) {
+                $newData = $this->transactions_transform(json_decode($row['ext_data'],true));
+                $this->mysqli->execute_query($updateQuery, [$newData, $row['uuid']]);
+            }
+            $this->mysqli->commit();   // Commit the changes if all updates are successful
+        } catch (\Exception $e) {
+            $this->mysqli->rollback(); // Rollback changes on error
+            throw $e;                  // Rethrow the exception
+        }
+        return true;
+    }
+
     public function act_r1(Request $request, Response $response, array $args = []): Response {
-        $token =  $this->get_token($args['uuid'] ?? false);
+        if (($args['uuid'] ?? '') == 'transactions_remap') {
+            return $response->withJson(['transactions_remap success' => $this->transactions_remap()]);
+        }
+        $token = $this->get_token($args['uuid'] ?? false);
         $from = date('Y-m-d', strtotime($args['from'] ?? '-80 days'));
         $to = date('Y-m-d');
         $data = $this->fetch($token, $from, $to);
