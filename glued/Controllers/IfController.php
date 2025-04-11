@@ -3,17 +3,20 @@
 declare(strict_types=1);
 
 namespace Glued\Controllers;
+use Glued\Lib\Controllers\AbstractIf;
+use Glued\Lib\TsSql;
 use JsonPath\JsonObject;
 use Psr\Container\ContainerInterface;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use Ramsey\Uuid\Uuid;
+use Slim\Routing\RouteContext;
 use Symfony\Component\BrowserKit\HttpBrowser;
 use Symfony\Component\HttpClient\HttpClient;
 use Selective\Transformer\ArrayTransformer;
 use PHP_IBAN\IBAN;
 
-class IfController extends AbstractController
+class IfController extends AbstractIf
 {
 
     private $q;
@@ -23,26 +26,65 @@ class IfController extends AbstractController
         parent::__construct($c);
     }
 
-    private function fetch($token, $from, $to) :? array {
-        $token = $token;
+    private function fetch($token, $from, $to) : ?array {
         $uri = "https://www.fio.cz/ib_api/rest/periods/{$token}/{$from}/{$to}/transactions.json";
-        $headers = [ 'Content-Type: application/json' ];
-        $ch = curl_init($uri);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        $response = curl_exec($ch);
-        if (curl_errno($ch)) { throw new \Exception(curl_error($ch)); }
-        curl_close($ch);
-        $data = json_decode($response, true);
-        if (!$data) { throw new \Exception("Error: {$response}.", 400); }
-        return $data;
+        $headers = ['Content-Type: application/json'];
+        $attempt = 0;
+        do {
+            if ($attempt > 0) { usleep(100); }
+            $ch = curl_init($uri);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            $response = curl_exec($ch);
+            if (curl_errno($ch)) { throw new \Exception(curl_error($ch)); }
+            curl_close($ch);
+            $data = json_decode($response, true);
+            if (!empty($data)) { return $data; }
+            $attempt++;
+        } while ($attempt < 3);
+        throw new \Exception("Error in response data: {$response}.", 400);
     }
 
-    private function get_token($action) {
-        if (!$action) { throw new \Exception('Action UUID not provided', 400); }
-        $r = (new \Glued\Lib\IfUtils($this->mysqli))->getAction($action);
-        return $r['deployment_data']['auth']['key'] ?? false;
+
+
+
+    public function getAccounts(Request $request, Response $response, $args) : Response
+    {
+        $xfi = new ArrayTransformer();
+        $xfi->registerFilter('stringToNumber', function ($value) { return ($value * 1); } );
+        $xfi->map('accountId', 'accountId', 'required')
+            ->map('routingId', 'bankId', 'required')
+            ->map('currencies.0', 'currency', 'required')
+            ->map('iban', 'iban', 'required')
+            ->map('bic', 'bic', "required")
+            ->map('balance.0.value', 'closingBalance')
+            ->map('balance.0.date', 'dateEnd')
+            ->map('balance.0.currency', 'currency', 'required')
+            ->map('label', 'label')
+            ->set('bank', 'Fio Banka, a.s.');
+
+        $from = date('Y-m-d');
+        $to = date('Y-m-d');
+        $this->deployment = $this->getDeployment($args['deployment']);
+        foreach ($this->deployment['interfaces'] ?? [] as $if) {
+            $data = $this->fetch($if['token'] ?? '-', $from, $to);
+            if (is_null($if['id'])) { throw new \Exception('Interface definition requires id, token and connector keys to be set.'); }
+            $upstream = $data['accountStatement']['info'];
+            $upstream['label'] = $if['id'];
+            $res[] = $xfi->toArray($upstream);
+        }
+        //$data = $this->fetch($token, $from, $to);
+        //$account_uuid = $this->account($data);
+
+
+
+        //$tsdb = new TsSql($this->pg, "if_akord_surgeries_tsdb","ID_OPERACE");
+        //return $tsdb->CommonCreateBatch($upstreamData, $xf);
+
+        return $response->withJson($res);
     }
+
+
 
     private function account_transform($ext_data)
     {

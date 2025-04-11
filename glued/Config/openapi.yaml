@@ -1,0 +1,141 @@
+openapi: 3.1.0
+info:
+  title: IF/fio.cz API
+  description: Bindings to the fio.cz.
+  version: 1.0.0
+  x-glued-service: if/fio_cz
+servers:
+  - url: /api/if/svc/fio_cz
+paths:
+  /:
+    x-glued-pathname: be_if_svc_fio_cz
+    x-glued-provides: openapi
+    get:
+      x-glued-method: Glued\Controllers\IfController:getOpenapi
+      summary: IF/fio.cz OpenAPI specs and ingress
+      description: IF/fio.cz Ingress point. Returns the OpenAPI YAML specification for the IF API.
+      operationId: IfFioCzIngress
+      responses:
+        '200':
+          description: Ok
+          content:
+            application/yaml:
+              schema:
+                type: string
+  /v1:
+    x-glued-pathname: be_if_svc_fio_cz_deployments
+    x-glued-provides: service
+    get:
+      x-glued-method: Glued\Controllers\IfController:getDeployments
+      summary: IF/fio.cz deployments
+      description: IF/fio.cz deployments.
+      operationId: IfFioCzDeployments
+      responses:
+        '200':
+          description: Ok
+          content:
+            application/yaml:
+              schema:
+                type: string
+  /v1/{deployment}:
+    x-glued-pathname: be_if_svc_fio_cz_methods
+    x-glued-provides: service
+    get:
+      x-glued-method: Glued\Controllers\IfController:methods
+      summary: Methods
+      description: A list of methods available to version/deployment combination.
+      operationId: IfFioCzMethods
+      parameters:
+        - name: deployment
+          in: path
+          required: true
+          description: Get available deployments at /api/if/v1/deployments?name=fio_cz
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Ok
+  /v1/{deployment}/health:
+    x-glued-pathname: be_if_svc_fio_cz_health
+    x-glued-provides: health
+    get:
+      x-glued-method: Glued\Controllers\IfController:getHealth
+      summary: Healthcheck
+      description: A healthcheck endpoint.
+      operationId: IfFioCzHealth
+      parameters:
+        - name: deployment
+          in: path
+          required: true
+          description: Get available deployments at /api/if/v1/deployments?name=fio_cz
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Ok
+  /v1/{deployment}/accounts:
+    x-glued-pathname: be_if_svc_fio_cz_accounts
+    x-glued-provides: service
+    get:
+      x-glued-method: Glued\Controllers\IfController:getAccounts
+      summary: Accounts
+      description: Get accounts accessible with the API key
+      operationId: IfFioCzGetAccounts
+      parameters:
+        - name: deployment
+          in: path
+          required: true
+          description: Get available deployments at /api/if/v1/deployments?name=fio_cz
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Ok
+  /v1/{deployment}/accounts/{uuid}/transactions:
+    x-glued-pathname: be_if_svc_fio_cz_account_transactions
+    x-glued-provides: service
+    get:
+      x-glued-method: Glued\Controllers\IfController:getTransactions
+      summary: Transactions
+      description: Get all surgery's revisions
+      operationId: IfFioCzGetTransactions
+      parameters:
+        - name: deployment
+          in: path
+          required: true
+          description: Get available deployments at /api/if/v1/deployments?name=fio_cz
+          schema:
+            type: string
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Ok
+  /v1/{deployment}/accounts/{uuid}/payments:
+    x-glued-pathname: be_if_svc_fio_cz_account_payments
+    x-glued-provides: service
+    get:
+      x-glued-method: Glued\Controllers\SurgeriesController:getPayments
+      summary: Payments
+      description: Get scheduled payments
+      operationId: IfFioCzGetPayments
+      parameters:
+        - name: deployment
+          in: path
+          required: true
+          description: Get available deployments at /api/if/v1/deployments?name=fio_cz
+          schema:
+            type: string
+        - name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Ok
