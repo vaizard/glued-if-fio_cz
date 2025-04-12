@@ -85,14 +85,8 @@
       "vendor/vaizard/glued-lib/src/Scripts/migrate.sh"
     ],
     "nginx": [
-      "patch -s --reject-file=/dev/null -p1 vendor/monolog/monolog/src/Monolog/Logger.php < vendor/vaizard/glued-lib/src/Patches/Logger.patch",
       "vendor/vaizard/glued-lib/src/Scripts/nginx.sh",
-      "Glued\\Lib\\ComposerHooks::generateNginx",
-      "vendor/vaizard/glued-lib/src/Scripts/nginx-reload.sh",
-      "vendor/vaizard/glued-lib/src/Scripts/php-fpm.sh",
-      "Glued\\Lib\\ComposerHooks::generatePHPFPM",
-      "vendor/vaizard/glued-lib/src/Scripts/php-fpm-reload.sh",
-      "patch -Rs --reject-file=/dev/null -p1 vendor/monolog/monolog/src/Monolog/Logger.php < vendor/vaizard/glued-lib/src/Patches/Logger.patch"
+      "vendor/vaizard/glued-lib/src/Scripts/nginx-reload.sh"
     ],
     "settings": [
       "Glued\\Lib\\ComposerHooks::PrintSettings"
